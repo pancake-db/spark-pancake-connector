@@ -22,7 +22,7 @@ val assemblyIncludedJars = Array[String](
   "idl",
   "protobuf-java",
   "sbt-jni-core",
-  "spark-pancake",
+  "pancake",
 )
 assemblyExcludedJars in assembly := {
   val cp = (assembly / fullClasspath).value
@@ -43,10 +43,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-streaming" % sparkVersion % "provided",
   "com.google.protobuf" % "protobuf-java-util" % "3.18.1",
-  "com.github.sbt" %% "sbt-jni-core" % "1.5.3",
-  "com.pancakedb" %% "pancake-db-client" % "0.0.0-alpha.0",
+  "com.pancakedb" %% "spark-pancake-db-connector" % "0.0.0-alpha.0",
 
-  "com.github.sbt" %% "sbt-jni-core" % "1.5.3",
   "org.apache.hadoop" % "hadoop-aws" % hadoopVersion,
   "com.amazonaws" % "aws-java-sdk-core" % awsVersion,
   "com.amazonaws" % "aws-java-sdk-dynamodb" % awsVersion, //frustratingly an import needed in hadoop aws
