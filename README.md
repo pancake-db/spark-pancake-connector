@@ -66,3 +66,13 @@ All the PancakeDB-specific options are:
   * Defaults to 256, which is the max and should be the best option
 
 See [Parameters.scala](https://github.com/pancake-db/spark-pancake-connector/blob/main/src/main/scala/com/pancakedb/spark/Parameters.scala).
+
+## `select` and `where` Pushdown
+
+The connector takes advantage of 2 things when reading in batch data:
+* `select` clauses with specific column names allow it to read in only the data for
+those columns.
+* `where` clauses with `===`, `>`, `>=`, `<`, `<=` on partition columns allow
+it to read in only the data that matches those filters.
+
+All other filters are applied only on the Spark side.
