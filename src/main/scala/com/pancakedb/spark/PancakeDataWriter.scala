@@ -3,7 +3,7 @@ package com.pancakedb.spark
 import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl
 import com.pancakedb.idl.{Field, PartitionField, WriteToPartitionRequest}
-import com.pancakedb.spark.PancakeDataWriter.{HashedPartition, PancakeCommitMessage}
+import com.pancakedb.spark.PancakeDataWriter.{HashedPartition, NWrittenPerInfo, PancakeCommitMessage}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
 import org.slf4j.LoggerFactory
@@ -23,6 +23,7 @@ case class PancakeDataWriter(
 ) extends DataWriter[InternalRow] {
   private val stagedRows = mutable.Map.empty[HashedPartition, ArrayBuffer[idl.Row]]
   private val logger = LoggerFactory.getLogger(getClass)
+  private var nWritten = 0
 
   def makeHashedPartition(row: InternalRow): HashedPartition = {
     val partition = partitionFieldGetters.map(getter => getter(row))
@@ -37,14 +38,21 @@ case class PancakeDataWriter(
   }
 
   private def flushPartition(partition: HashedPartition): Unit = {
-    logger.debug(s"Flushing write of ${stagedRows(partition).length} rows to PancakeDB")
+    logger.debug(s"Task $taskId Spark partition $partitionId flushing write of ${stagedRows(partition).length} rows")
+    val rows = stagedRows(partition)
     val req = WriteToPartitionRequest.newBuilder()
       .setTableName(params.tableName)
       .addAllPartition(partition.partition.toBuffer.asJava)
-      .addAllRows(stagedRows(partition).asJava)
+      .addAllRows(rows.asJava)
       .build()
     stagedRows(partition) = ArrayBuffer.empty
     client.Api.writeToPartition(req)
+
+    val newNWritten = nWritten + rows.length
+    if (newNWritten / NWrittenPerInfo != nWritten / NWrittenPerInfo) {
+      logger.info(s"Task $taskId Spark partition $partitionId has written $newNWritten rows and going")
+    }
+    nWritten = newNWritten
   }
 
   override def write(record: InternalRow): Unit = {
@@ -77,6 +85,8 @@ case class PancakeDataWriter(
 }
 
 object PancakeDataWriter {
+  private val NWrittenPerInfo = 10000
+
   case class PancakeCommitMessage() extends WriterCommitMessage
 
   case class HashedPartition(

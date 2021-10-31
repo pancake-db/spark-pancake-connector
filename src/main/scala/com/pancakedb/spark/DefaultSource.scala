@@ -37,18 +37,4 @@ class DefaultSource
       Some(schema),
     )
   }
-
-//  override def createRelation(
-//    sqlContext: SQLContext,
-//    mode: SaveMode,
-//    parameters: Map[String, String],
-//    data: DataFrame
-//  ): BaseRelation = {
-//    val params = Parameters.fromMap(parameters)
-//    PancakeTable(
-//      sqlContext,
-//      params,
-//
-//    )
-//  }
 }

@@ -54,11 +54,12 @@ case class PancakeSegmentReader(
           segment.getSegmentId,
           columnMetas(columnName),
         )
-        logger.debug(
+        logger.info(
           s"""Queried and decoded columnar bytes for segment
-             |${segment.getSegmentId}
-             |column $columnName in
-             |${System.currentTimeMillis() - startTime}ms""".stripMargin
+             | ${segment.getSegmentId}
+             | column $columnName in
+             | ${System.currentTimeMillis() - startTime}ms"""
+            .stripMargin.replaceAll("\n", "")
         )
         res
       })
@@ -126,10 +127,11 @@ case class PancakeSegmentReader(
       case DataType.UNRECOGNIZED =>
         throw UnrecognizedDataTypeException
     }
-    logger.debug(
+    logger.info(
       s"""Filled Spark vector for segment ${inputSegment.segment.getSegmentId}
-         |column ${meta.getName} in
-         |${System.currentTimeMillis() - startTime}ms""".stripMargin
+         | column ${meta.getName} in
+         | ${System.currentTimeMillis() - startTime}ms"""
+        .stripMargin.replaceAll("\n", "")
     )
   }
 }

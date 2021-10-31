@@ -18,8 +18,16 @@ case class PancakeWriteBuilder(
   pancakeSchemaCache: SchemaCache,
   schema: StructType,
   client: PancakeClient,
-) extends WriteBuilder with BatchWrite with StreamingWrite {
+) extends WriteBuilder with BatchWrite with StreamingWrite with SupportsTruncate {
   private val logger = LoggerFactory.getLogger(getClass)
+  private var isTruncate = false
+
+  // SupportsTruncate methods
+  override def truncate(): WriteBuilder = {
+    logger.info("TRUNCATE SET TO TRUE")
+    isTruncate = true
+    this
+  }
 
   // WriteBuilder methods
   override def buildForBatch(): BatchWrite = {
@@ -34,24 +42,44 @@ case class PancakeWriteBuilder(
   override def createBatchWriterFactory(info: PhysicalWriteInfo): PancakeDataWriterFactory = {
     val dfIdxByName = schema.fields.indices.map(idx => schema.fields(idx).name -> idx).toMap
 
-    val pancakeSchema = pancakeSchemaCache.getOption match {
+    val (exists, pancakeSchema) = pancakeSchemaCache.getOption match {
       case Some(pSchema) =>
-        logger.debug(s"Table ${params.tableName} is already known to exist; using its schema")
-        pSchema
+        logger.info(s"Table ${params.tableName} is already known to exist; using its schema")
+        (true, pSchema)
       case None =>
-        logger.info(
-          s"""Table ${params.tableName} does not exist yet;
-             | creating it with unpartitioned schema for write""".stripMargin
-        )
         val pSchema = PancakeWriteBuilder.defaultPancakeSchemaFor(schema)
-        val createTableRequest = CreateTableRequest.newBuilder()
-          .setTableName(params.tableName)
-          .setMode(CreateTableRequest.SchemaMode.FAIL_IF_EXISTS)
-          .setSchema(pSchema)
-          .build()
-        client.Api.createTable(createTableRequest)
         pancakeSchemaCache.set(pSchema)
-        pSchema
+        (false, pSchema)
+    }
+
+    if (exists && isTruncate) {
+      logger.info(
+        s"""Table ${params.tableName} exists but we are in truncate mode;
+           | dropping it and recreating"""
+          .stripMargin.replaceAll("\n", "")
+      )
+      val dropTableRequest = DropTableRequest.newBuilder()
+        .setTableName(params.tableName)
+        .build()
+      client.Api.dropTable(dropTableRequest)
+      val createTableRequest = CreateTableRequest.newBuilder()
+        .setTableName(params.tableName)
+        .setMode(CreateTableRequest.SchemaMode.FAIL_IF_EXISTS)
+        .setSchema(pancakeSchema)
+        .build()
+      client.Api.createTable(createTableRequest)
+    } else if (!exists) {
+      logger.info(
+        s"""Table ${params.tableName} does not exist yet;
+           | creating it with unpartitioned schema for write"""
+          .stripMargin.replaceAll("\n", "")
+      )
+      val createTableRequest = CreateTableRequest.newBuilder()
+        .setTableName(params.tableName)
+        .setMode(CreateTableRequest.SchemaMode.FAIL_IF_EXISTS)
+        .setSchema(pancakeSchema)
+        .build()
+      client.Api.createTable(createTableRequest)
     }
 
     val partitionFieldGetters = pancakeSchema

@@ -8,7 +8,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.connector.catalog.{SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.connector.read.ScanBuilder
-import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
+import org.apache.spark.sql.connector.write.{LogicalWriteInfo, SupportsTruncate, WriteBuilder}
 import org.apache.spark.sql.types.{DataType, DataTypes, StructField, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.slf4j.LoggerFactory
@@ -36,6 +36,7 @@ case class PancakeTable(
       TableCapability.BATCH_READ,
       TableCapability.BATCH_WRITE,
       TableCapability.STREAMING_WRITE,
+      TableCapability.TRUNCATE,
     ).asJava
   }
 
