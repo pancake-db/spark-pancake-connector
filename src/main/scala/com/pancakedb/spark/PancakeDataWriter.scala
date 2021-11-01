@@ -85,7 +85,7 @@ case class PancakeDataWriter(
 }
 
 object PancakeDataWriter {
-  private val NWrittenPerInfo = 10000
+  private val NWrittenPerInfo = 50000
 
   case class PancakeCommitMessage() extends WriterCommitMessage
 

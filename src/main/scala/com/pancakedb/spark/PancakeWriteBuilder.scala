@@ -24,7 +24,6 @@ case class PancakeWriteBuilder(
 
   // SupportsTruncate methods
   override def truncate(): WriteBuilder = {
-    logger.info("TRUNCATE SET TO TRUE")
     isTruncate = true
     this
   }

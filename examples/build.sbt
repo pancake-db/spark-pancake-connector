@@ -24,7 +24,7 @@ val assemblyIncludedJars = Array[String](
   "sbt-jni-core",
   "pancake",
 )
-assemblyExcludedJars in assembly := {
+assembly / assemblyExcludedJars := {
   val cp = (assembly / fullClasspath).value
   println("ASSEMBLY JARS:")
   cp filter {classPath =>
@@ -36,6 +36,10 @@ assemblyExcludedJars in assembly := {
     }
     !include
   }
+}
+assembly / assemblyMergeStrategy := {
+  case "META-INF/services/org.apache.spark.sql.sources.DataSourceRegister" => MergeStrategy.concat
+  case _ => MergeStrategy.first
 }
 
 libraryDependencies ++= Seq(
