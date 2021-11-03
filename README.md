@@ -1,3 +1,8 @@
+[![Maven Central][maven-badge]][maven-url]
+
+[maven-badge]: https://maven-badges.herokuapp.com/maven-central/com.pancakedb/spark-pancake-db-connector_2.12/badge.svg
+[maven-url]: https://search.maven.org/artifact/com.pancakedb/spark-pancake-db-connector_2.12
+
 # Usage
 
 This connector allows you to
@@ -7,6 +12,7 @@ This connector allows you to
 
 It leverages native code to access the PancakeDB core library.
 The connector should work out of the box for the most common
+up-to-date
 OS/architecture combinations, but if you need to build the native libraries
 for your own, see [the client library docs](https://github.com/pancake-db/pancake-scala-client#Requirements).
 
@@ -75,4 +81,4 @@ those columns.
 * `where` clauses with `===`, `>`, `>=`, `<`, `<=` on partition columns allow
 it to read in only the data that matches those filters.
 
-All other filters are applied only on the Spark side.
+All other filters are applied on the Spark side.
