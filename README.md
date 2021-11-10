@@ -19,7 +19,7 @@ for your own, see [the client library docs](https://github.com/pancake-db/pancak
 In your `build.sbt` or equivalent,
 
 ```
-libraryDependencies += "com.pancakedb" % "spark-pancake-db-connector_2.12" % "0.0.0-alpha.0"
+libraryDependencies += "com.pancakedb" % "spark-pancake-db-connector_2.12" % "0.0.0-alpha.0-full"
 ```
 
 ## Scala Example
