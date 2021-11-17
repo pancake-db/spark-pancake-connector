@@ -2,7 +2,7 @@ credentials += Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
 
 ThisBuild / organization := "com.pancakedb"
 ThisBuild / organizationName := "PancakeDB"
-ThisBuild / organizationHomepage := Some(url("https://github.com/pancake-db/"))
+ThisBuild / organizationHomepage := Some(url("https://pancakedb.com"))
 
 ThisBuild / scmInfo := Some(
   ScmInfo(
