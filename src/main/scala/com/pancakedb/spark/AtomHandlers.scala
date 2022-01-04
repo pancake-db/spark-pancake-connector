@@ -16,6 +16,13 @@ object AtomHandlers {
     override val inherentNestingDepth: Int = 0
   }
 
+  object FloatHandler extends AtomHandler[Float] {
+    override def appendAtomic(vector: WritableColumnVector, value: Float): Unit = {
+      vector.appendFloat(value)
+    }
+    override val inherentNestingDepth: Int = 0
+  }
+
   object DoubleHandler extends AtomHandler[Double] {
     override def appendAtomic(vector: WritableColumnVector, value: Double): Unit = {
       vector.appendDouble(value)

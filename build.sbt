@@ -1,6 +1,6 @@
 name := "spark-pancake-db-connector"
 
-version := "0.0.0-alpha.0-full"
+version := "0.0.0-alpha.1"
 
 scalaVersion := "2.12.14"
 
@@ -11,7 +11,8 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided" withSources(),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-streaming" % sparkVersion % "provided",
-  "com.pancakedb" %% "pancake-db-client" % "0.0.0-alpha.0-full",
+  "com.pancakedb" % "idl" % "0.0.0-alpha.1",
+  "com.pancakedb" %% "pancake-db-client" % "0.0.0-alpha.1",
 
   "org.scalatest" %% "scalatest" % "3.2.9" % Test,
 )

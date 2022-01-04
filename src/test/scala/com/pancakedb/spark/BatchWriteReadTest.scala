@@ -15,7 +15,7 @@ class BatchWriteReadTest extends SparkTestBase {
   val port = 1337
 
   // running this test requires a local instance of PancakeDB on the port
-  "writing and reading back a df" should "preserve row count" ignore {
+  "writing and reading back a df" should "preserve row count" in {
     val tableName = "batch_write_read_test"
 
     val client = PancakeClient(host, port)
@@ -25,12 +25,14 @@ class BatchWriteReadTest extends SparkTestBase {
       case HttpException(404, _) =>
     }
     val schema = Schema.newBuilder()
-      .addPartitioning(PartitionMeta.newBuilder().setName("part").setDtype(PartitionDataType.TIMESTAMP_MINUTE))
-      .addColumns(ColumnMeta.newBuilder().setName("i").setDtype(DataType.INT64))
-      .addColumns(ColumnMeta.newBuilder().setName("s").setDtype(DataType.STRING))
-      .addColumns(ColumnMeta.newBuilder().setName("l").setDtype(DataType.STRING).setNestedListDepth(1))
-      .addColumns(ColumnMeta.newBuilder().setName("by").setDtype(DataType.BYTES))
-      .addColumns(ColumnMeta.newBuilder().setName("t").setDtype(DataType.TIMESTAMP_MICROS))
+      .putPartitioning("part", PartitionMeta.newBuilder().setDtype(PartitionDataType.TIMESTAMP_MINUTE).build())
+      .putColumns("i", ColumnMeta.newBuilder().setDtype(DataType.INT64).build())
+      .putColumns("s", ColumnMeta.newBuilder().setDtype(DataType.STRING).build())
+      .putColumns("l", ColumnMeta.newBuilder().setDtype(DataType.STRING).setNestedListDepth(1).build())
+      .putColumns("b", ColumnMeta.newBuilder().setDtype(DataType.BYTES).build())
+      .putColumns("t", ColumnMeta.newBuilder().setDtype(DataType.TIMESTAMP_MICROS).build())
+      .putColumns("f", ColumnMeta.newBuilder().setDtype(DataType.FLOAT32).build())
+      .putColumns("d", ColumnMeta.newBuilder().setDtype(DataType.FLOAT64).build())
       .build()
     val createTableReq = CreateTableRequest.newBuilder()
       .setTableName(tableName)
@@ -50,9 +52,11 @@ class BatchWriteReadTest extends SparkTestBase {
         part = partitionTs,
         i = Some(33L),
         s = Some("ssss"),
-        by = Some(Array(3, 4, 5).map(_.toByte)),
+        b = Some(Array(3, 4, 5).map(_.toByte)),
         l = Some(Array("l0", "l1")),
         t = Some(ts),
+        f = Some(1.11.toFloat),
+        d = Some(2.22),
       )
     }
     val inputDf = session.createDataset[TestRow](inputRows)
@@ -73,7 +77,7 @@ class BatchWriteReadTest extends SparkTestBase {
       .option("port", port)
       .option("table_name", tableName)
       .load()
-    val rows = df.select("part", "i", "s", "by", "l", "t").where(df.col("part") === partitionTs).collect()
+    val rows = df.select("part", "i", "s", "b", "l", "t", "f", "d").where(df.col("part") === partitionTs).collect()
     println(s"I found ${rows.length} rows:")
     for (i <- 0 until 20) {
       println(s"\trow $i: ${rows(i)}")
@@ -89,9 +93,11 @@ object BatchWriteReadTest {
     i: Option[Long],
     s: Option[String],
     l: Option[Array[String]],
-    by: Option[Array[Byte]],
-    t: Option[Timestamp]
+    b: Option[Array[Byte]],
+    t: Option[Timestamp],
+    f: Option[Float],
+    d: Option[Double],
   )
 
-  val baseRow: TestRow = TestRow(new Timestamp(0), None, None, None, None, None)
+  val baseRow: TestRow = TestRow(new Timestamp(0), None, None, None, None, None, None, None)
 }

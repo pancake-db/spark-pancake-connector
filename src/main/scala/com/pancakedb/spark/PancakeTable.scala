@@ -8,7 +8,7 @@ import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.connector.catalog.{SupportsRead, SupportsWrite, Table, TableCapability}
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.connector.read.ScanBuilder
-import org.apache.spark.sql.connector.write.{LogicalWriteInfo, SupportsTruncate, WriteBuilder}
+import org.apache.spark.sql.connector.write.{LogicalWriteInfo, WriteBuilder}
 import org.apache.spark.sql.types.{DataType, DataTypes, StructField, StructType}
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.slf4j.LoggerFactory
@@ -69,13 +69,14 @@ case class PancakeTable(
 object PancakeTable {
   def convertSchema(pancakeSchema: Schema): StructType = {
     val fields = ArrayBuffer.empty[StructField]
-    pancakeSchema.getColumnsList.forEach(columnMeta => {
-      fields += columnMetaToStructField(columnMeta)
+    pancakeSchema.getColumnsMap.forEach({case (columnName, columnMeta) =>
+      fields += columnMetaToStructField(columnName, columnMeta)
     })
-    pancakeSchema.getPartitioningList.forEach(meta => {
-      fields += partitioningMetaToStructField(meta)
+    pancakeSchema.getPartitioningMap.forEach({case (partitioningName, partitioningMeta) =>
+      fields += partitioningMetaToStructField(partitioningName, partitioningMeta)
     })
-    StructType(fields)}
+    StructType(fields)
+  }
 
   def convertDataType(dtype: idl.DataType, nestingDepth: Int): DataType = {
     var sparkDtype = dtype match {
@@ -83,6 +84,7 @@ object PancakeTable {
       case idl.DataType.STRING => DataTypes.StringType
       case idl.DataType.BOOL => DataTypes.BooleanType
       case idl.DataType.BYTES => DataTypes.BinaryType
+      case idl.DataType.FLOAT32 => DataTypes.FloatType
       case idl.DataType.FLOAT64 => DataTypes.DoubleType
       case idl.DataType.TIMESTAMP_MICROS => DataTypes.TimestampType
       case idl.DataType.UNRECOGNIZED => throw UnrecognizedDataTypeException
@@ -93,11 +95,11 @@ object PancakeTable {
     sparkDtype
   }
 
-  def columnMetaToStructField(col: ColumnMeta): StructField = {
-    StructField.apply(col.getName, convertDataType(col.getDtype, col.getNestedListDepth))
+  def columnMetaToStructField(name: String, col: ColumnMeta): StructField = {
+    StructField.apply(name, convertDataType(col.getDtype, col.getNestedListDepth))
   }
 
-  def partitioningMetaToStructField(meta: PartitionMeta): StructField = {
+  def partitioningMetaToStructField(name: String, meta: PartitionMeta): StructField = {
     val dtype = meta.getDtype match {
       case PartitionDataType.INT64 => DataTypes.LongType
       case PartitionDataType.STRING => DataTypes.StringType
@@ -105,6 +107,6 @@ object PancakeTable {
       case PartitionDataType.TIMESTAMP_MINUTE => DataTypes.TimestampType
       case PartitionDataType.UNRECOGNIZED => throw UnrecognizedPartitionDataTypeException
     }
-    StructField.apply(meta.getName, dtype)
+    StructField.apply(name, dtype)
   }
 }

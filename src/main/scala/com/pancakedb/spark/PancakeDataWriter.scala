@@ -2,7 +2,7 @@ package com.pancakedb.spark
 
 import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl
-import com.pancakedb.idl.{Field, PartitionField, WriteToPartitionRequest}
+import com.pancakedb.idl.{FieldValue, PartitionFieldValue, WriteToPartitionRequest}
 import com.pancakedb.spark.PancakeDataWriter.{HashedPartition, NWrittenPerInfo, PancakeCommitMessage}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.{DataWriter, WriterCommitMessage}
@@ -18,22 +18,29 @@ case class PancakeDataWriter(
   numPartitions: Int,
   partitionId: Int,
   taskId: Long,
-  partitionFieldGetters: Array[InternalRow => PartitionField],
-  fieldGetters: Array[InternalRow => Field],
+  partitionFieldGetters: Array[PartitionFieldGetter],
+  fieldGetters: Array[FieldGetter],
 ) extends DataWriter[InternalRow] {
   private val stagedRows = mutable.Map.empty[HashedPartition, ArrayBuffer[idl.Row]]
   private val logger = LoggerFactory.getLogger(getClass)
   private var nWritten = 0
 
   def makeHashedPartition(row: InternalRow): HashedPartition = {
-    val partition = partitionFieldGetters.map(getter => getter(row))
-    HashedPartition.fromPartition(partition)
+    HashedPartition.fromTuples(partitionFieldGetters.map(getter => (getter.name, getter.get(row))))
   }
 
   def makePancakeRow(row: InternalRow): idl.Row = {
-    val values = fieldGetters.map(getter => getter(row))
+    val values = fieldGetters
+      .map(getter => (getter.name, getter.get(row)))
+      .filter({case (_, fv) =>
+        fv.getValueCase match {
+          case FieldValue.ValueCase.VALUE_NOT_SET => false
+          case _ => true
+        }
+      })
+      .toMap
     idl.Row.newBuilder()
-      .addAllFields(values.toBuffer.asJava)
+      .putAllFields(values.asJava)
       .build()
   }
 
@@ -42,7 +49,7 @@ case class PancakeDataWriter(
     val rows = stagedRows(partition)
     val req = WriteToPartitionRequest.newBuilder()
       .setTableName(params.tableName)
-      .addAllPartition(partition.partition.toBuffer.asJava)
+      .putAllPartition(partition.partitionValues.asJava)
       .addAllRows(rows.asJava)
       .build()
     stagedRows(partition) = ArrayBuffer.empty
@@ -90,27 +97,27 @@ object PancakeDataWriter {
   case class PancakeCommitMessage() extends WriterCommitMessage
 
   case class HashedPartition(
-    partition: Array[PartitionField],
+    partitionValues: Map[String, PartitionFieldValue],
     hash: Int,
   ) {
     override def hashCode(): Int = hash
 
     override def equals(obj: Any): Boolean = {
       val other = obj.asInstanceOf[HashedPartition]
-      other.hash == hash && partition.sameElements(other.partition)
+      other.hash == hash && partitionValues.equals(other.partitionValues)
     }
   }
 
   object HashedPartition {
-    def fromPartition(partition: Array[PartitionField]): HashedPartition = {
+    def fromTuples(partition: Array[(String, PartitionFieldValue)]): HashedPartition = {
       // improvise a hash fn
       var hash = 0
-      partition.foreach(field => {
+      partition.foreach({case (_, field) =>
         hash *= 1234577
         hash += field.hashCode()
       })
       HashedPartition(
-        partition,
+        partition.toMap,
         hash,
       )
     }

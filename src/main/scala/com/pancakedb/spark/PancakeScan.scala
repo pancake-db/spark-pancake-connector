@@ -26,9 +26,7 @@ case class PancakeScan(
   // override def supportColumnarReads(partition: InputPartition): Boolean = true
 
   override def planInputPartitions(): Array[InputPartition] = {
-    val partitionColumns = pancakeSchema.getPartitioningList.asScala
-      .map(partitionMeta => partitionMeta.getName -> partitionMeta)
-      .toMap
+    val partitionColumns = pancakeSchema.getPartitioningMap.asScala
     val useSegmentMeta = requiredColumns.forall(partitionColumns.contains)
 
     val listSegmentsReq = ListSegmentsRequest.newBuilder()

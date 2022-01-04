@@ -1,7 +1,6 @@
 package com.pancakedb.spark
 
 import com.pancakedb.client.PancakeClient
-import com.pancakedb.idl._
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write.streaming.StreamingDataWriterFactory
 import org.apache.spark.sql.connector.write.{DataWriter, DataWriterFactory}
@@ -10,8 +9,8 @@ case class PancakeDataWriterFactory(
   params: Parameters,
   client: PancakeClient,
   numPartitions: Int,
-  partitionFieldGetters: Array[InternalRow => PartitionField],
-  fieldGetters: Array[InternalRow => Field],
+  partitionFieldGetters: Array[PartitionFieldGetter],
+  fieldGetters: Array[FieldGetter],
 ) extends DataWriterFactory with StreamingDataWriterFactory {
   // for batch
   override def createWriter(partitionId: Int, taskId: Long): DataWriter[InternalRow] = {

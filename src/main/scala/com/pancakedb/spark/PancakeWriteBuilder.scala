@@ -7,7 +7,7 @@ import com.pancakedb.spark.Exceptions.{IncompatibleDataTypeException, Unrecogniz
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.write._
 import org.apache.spark.sql.connector.write.streaming.StreamingWrite
-import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, DoubleType, LongType, StringType, StructType, TimestampType, DataType => SparkDataType}
+import org.apache.spark.sql.types.{ArrayType, BinaryType, BooleanType, DoubleType, FloatType, LongType, StringType, StructType, TimestampType, DataType => SparkDataType}
 import org.apache.spark.unsafe.types.UTF8String
 import org.slf4j.LoggerFactory
 
@@ -82,39 +82,35 @@ case class PancakeWriteBuilder(
     }
 
     val partitionFieldGetters = pancakeSchema
-      .getPartitioningList
+      .getPartitioningMap
       .asScala
-      .map(meta => {
-        val idx = dfIdxByName(meta.getName)
-        val name = meta.getName
+      .map({case (name, meta) =>
+        val idx = dfIdxByName(name)
         val extractor = PancakeWriteBuilder.extractPartitionFieldFn(meta.getDtype, idx)
-        row: InternalRow => {
-          val builder = PartitionField.newBuilder()
-            .setName(name)
+        val get = (row: InternalRow) => {
+          val builder = PartitionFieldValue.newBuilder()
           extractor(row, builder)
           builder.build()
         }
+        PartitionFieldGetter(name, get)
       })
       .toArray
 
     val fieldGetters = pancakeSchema
-      .getColumnsList
+      .getColumnsMap
       .asScala
-      .map(meta => {
-        val idx = dfIdxByName(meta.getName)
-        val name = meta.getName
+      .map({case (name, meta) =>
+        val idx = dfIdxByName(name)
         val sparkDtype = schema.fields(idx).dataType
-        val extractor = PancakeWriteBuilder.extractFieldValueFn(meta, sparkDtype, idx)
-        row: InternalRow => {
+        val extract = PancakeWriteBuilder.extractFieldValueFn(meta, sparkDtype, idx)
+        val get = (row: InternalRow) => {
           val valueBuilder = FieldValue.newBuilder()
           if (!row.isNullAt(idx)) {
-            extractor(row, valueBuilder)
+            extract(row, valueBuilder)
           }
-          Field.newBuilder()
-            .setName(name)
-            .setValue(valueBuilder.build())
-            .build()
+          valueBuilder.build()
         }
+        FieldGetter(name, get)
       })
       .toArray
 
@@ -142,12 +138,12 @@ case class PancakeWriteBuilder(
 }
 
 object PancakeWriteBuilder {
-  def extractPartitionFieldFn(dataType: PartitionDataType, i: Int): (InternalRow, PartitionField.Builder) => Unit = {
+  def extractPartitionFieldFn(dataType: PartitionDataType, i: Int): (InternalRow, PartitionFieldValue.Builder) => Unit = {
     dataType match {
-      case PartitionDataType.INT64 => (row: InternalRow, builder: PartitionField.Builder) => builder.setInt64Val(row.getLong(i))
-      case PartitionDataType.STRING => (row: InternalRow, builder: PartitionField.Builder) => builder.setStringVal(row.getString(i))
-      case PartitionDataType.BOOL => (row: InternalRow, builder: PartitionField.Builder) => builder.setBoolVal(row.getBoolean(i))
-      case PartitionDataType.TIMESTAMP_MINUTE => (row: InternalRow, builder: PartitionField.Builder) => builder.setTimestampVal(microsToPbTimestamp(row.getLong(i)))
+      case PartitionDataType.INT64 => (row: InternalRow, builder: PartitionFieldValue.Builder) => builder.setInt64Val(row.getLong(i))
+      case PartitionDataType.STRING => (row: InternalRow, builder: PartitionFieldValue.Builder) => builder.setStringVal(row.getString(i))
+      case PartitionDataType.BOOL => (row: InternalRow, builder: PartitionFieldValue.Builder) => builder.setBoolVal(row.getBoolean(i))
+      case PartitionDataType.TIMESTAMP_MINUTE => (row: InternalRow, builder: PartitionFieldValue.Builder) => builder.setTimestampVal(microsToPbTimestamp(row.getLong(i)))
       case PartitionDataType.UNRECOGNIZED => throw UnrecognizedPartitionDataTypeException
     }
   }
@@ -174,6 +170,7 @@ object PancakeWriteBuilder {
         case DataType.STRING => (row: InternalRow, builder: FieldValue.Builder) => builder.setStringVal(row.getString(i))
         case DataType.BOOL => (row: InternalRow, builder: FieldValue.Builder) => builder.setBoolVal(row.getBoolean(i))
         case DataType.BYTES => (row: InternalRow, builder: FieldValue.Builder) => builder.setBytesVal(ByteString.copyFrom(row.getBinary(i)))
+        case DataType.FLOAT32 => (row: InternalRow, builder: FieldValue.Builder) => builder.setFloat32Val(row.getFloat(i))
         case DataType.FLOAT64 => (row: InternalRow, builder: FieldValue.Builder) => builder.setFloat64Val(row.getDouble(i))
         case DataType.TIMESTAMP_MICROS => (row: InternalRow, builder: FieldValue.Builder) => builder.setTimestampVal(microsToPbTimestamp(row.getLong(i)))
         case DataType.UNRECOGNIZED => throw UnrecognizedDataTypeException
@@ -188,6 +185,7 @@ object PancakeWriteBuilder {
         case DataType.STRING => (value: Any, builder: FieldValue.Builder) => builder.setStringVal(value.asInstanceOf[UTF8String].toString)
         case DataType.BOOL => (value: Any, builder: FieldValue.Builder) => builder.setBoolVal(value.asInstanceOf[Boolean])
         case DataType.BYTES => (value: Any, builder: FieldValue.Builder) => builder.setBytesVal(ByteString.copyFrom(value.asInstanceOf[Array[Byte]]))
+        case DataType.FLOAT32 => (value: Any, builder: FieldValue.Builder) => builder.setFloat32Val(value.asInstanceOf[Float])
         case DataType.FLOAT64 => (value: Any, builder: FieldValue.Builder) => builder.setFloat64Val(value.asInstanceOf[Double])
         case DataType.TIMESTAMP_MICROS => (value: Any, builder: FieldValue.Builder) => builder.setTimestampVal(microsToPbTimestamp(value.asInstanceOf[Long]))
         case DataType.UNRECOGNIZED => throw UnrecognizedDataTypeException
@@ -220,6 +218,7 @@ object PancakeWriteBuilder {
             case BooleanType => pDtype = Some(DataType.BOOL)
             case LongType => pDtype = Some(DataType.INT64)
             case StringType => pDtype = Some(DataType.STRING)
+            case FloatType => pDtype = Some(DataType.FLOAT32)
             case DoubleType => pDtype = Some(DataType.FLOAT64)
             case BinaryType => pDtype = Some(DataType.BYTES)
             case TimestampType => pDtype = Some(DataType.TIMESTAMP_MICROS)
@@ -227,14 +226,16 @@ object PancakeWriteBuilder {
           }
         }
 
-        ColumnMeta.newBuilder()
-          .setName(structField.name)
+        val meta = ColumnMeta.newBuilder()
           .setNestedListDepth(depth)
           .setDtype(pDtype.get)
           .build()
+        (structField.name, meta)
       })
+      .toMap
+      .asJava
     Schema.newBuilder()
-      .addAllColumns(columns.toBuffer.asJava)
+      .putAllColumns(columns)
       .build()
   }
 }

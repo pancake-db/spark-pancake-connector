@@ -3,9 +3,10 @@ package com.pancakedb.spark
 import com.google.protobuf.{Timestamp => PbTimestamp}
 import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl
-import com.pancakedb.idl.{PartitionDataType, PartitionField, PartitionFilter}
+import com.pancakedb.idl.PartitionFieldComparison.Operator
+import com.pancakedb.idl.{PartitionDataType, PartitionFieldComparison, PartitionFieldValue, PartitionFilter}
 import com.pancakedb.spark.Exceptions.UnrecognizedPartitionDataTypeException
-import com.pancakedb.spark.PancakeScanBuilder.setPartitionFieldValue
+import com.pancakedb.spark.PancakeScanBuilder.partitionFieldValue
 import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
@@ -32,33 +33,34 @@ case class PancakeScanBuilder(
   }
 
   override def pushFilters(filters: Array[Filter]): Array[Filter] = {
-    val partitionColumns = pancakeSchema.getPartitioningList.asScala
-      .map(partitionMeta => partitionMeta.getName -> partitionMeta)
-      .toMap
+    val partitionColumns = pancakeSchema.getPartitioningMap.asScala
 
-    def addFilter(attribute: String, value: Any, filter: Filter, makePancakeFilter: PartitionField => PartitionFilter):  Unit = {
+    def addFilter(attribute: String, value: Any, filter: Filter, operator: PartitionFieldComparison.Operator):  Unit = {
       partitionColumns.get(attribute).foreach(partitionMeta => {
-        val partitionFieldBuilder = PartitionField.newBuilder()
+        val comparison = PartitionFieldComparison.newBuilder()
           .setName(attribute)
-        setPartitionFieldValue(partitionFieldBuilder, partitionMeta.getDtype, value)
+          .setOperator(operator)
+          .setValue(partitionFieldValue(partitionMeta.getDtype, value))
 
         partitionFilters += filter
-        val pancakeFilter = makePancakeFilter(partitionFieldBuilder.build())
+        val pancakeFilter = PartitionFilter.newBuilder()
+          .setComparison(comparison)
+          .build()
         pancakeFilters += pancakeFilter
       })
     }
 
     filters.foreach({
       case EqualTo(attribute, value) =>
-        addFilter(attribute, value, EqualTo(attribute, value), field => PartitionFilter.newBuilder().setEqualTo(field).build())
+        addFilter(attribute, value, EqualTo(attribute, value), Operator.EQ_TO)
       case LessThan(attribute, value) =>
-        addFilter(attribute, value, LessThan(attribute, value), field => PartitionFilter.newBuilder().setLessThan(field).build())
+        addFilter(attribute, value, LessThan(attribute, value), Operator.LESS)
       case LessThanOrEqual(attribute, value) =>
-        addFilter(attribute, value, LessThanOrEqual(attribute, value), field => PartitionFilter.newBuilder().setLessOrEqTo(field).build())
+        addFilter(attribute, value, LessThanOrEqual(attribute, value), Operator.LESS_OR_EQ_TO)
       case GreaterThan(attribute, value) =>
-        addFilter(attribute, value, GreaterThan(attribute, value), field => PartitionFilter.newBuilder().setGreaterThan(field).build())
+        addFilter(attribute, value, GreaterThan(attribute, value), Operator.GREATER)
       case GreaterThanOrEqual(attribute, value) =>
-        addFilter(attribute, value, GreaterThanOrEqual(attribute, value), field => PartitionFilter.newBuilder().setGreaterOrEqTo(field).build())
+        addFilter(attribute, value, GreaterThanOrEqual(attribute, value), Operator.GREATER_OR_EQ_TO)
       case _ =>
     })
     //could further optimize by returning only non-pushed filters
@@ -71,7 +73,8 @@ case class PancakeScanBuilder(
 }
 
 object PancakeScanBuilder {
-  def setPartitionFieldValue(builder: PartitionField.Builder, dtype: PartitionDataType, value: Any): Unit = {
+  def partitionFieldValue(dtype: PartitionDataType, value: Any): PartitionFieldValue = {
+    val builder = PartitionFieldValue.newBuilder()
     dtype match {
       case PartitionDataType.INT64 =>
         builder.setInt64Val(value.asInstanceOf[Long])
@@ -89,5 +92,6 @@ object PancakeScanBuilder {
         builder.setTimestampVal(pbTimestamp)
       case PartitionDataType.UNRECOGNIZED => throw UnrecognizedPartitionDataTypeException
     }
+    builder.build()
   }
 }

@@ -3,7 +3,7 @@ package com.pancakedb.spark
 import com.google.protobuf.{Timestamp => PbTimestamp}
 import com.pancakedb.client.{PancakeClient, RepLevelsColumn}
 import com.pancakedb.idl._
-import com.pancakedb.spark.AtomHandlers.{BooleanHandler, ByteHandler, DoubleHandler, LongHandler}
+import com.pancakedb.spark.AtomHandlers.{BooleanHandler, ByteHandler, DoubleHandler, FloatHandler, LongHandler}
 import com.pancakedb.spark.Exceptions.{UnrecognizedDataTypeException, UnrecognizedPartitionDataTypeException}
 import com.pancakedb.spark.PancakeScan.PancakeInputSegment
 import com.pancakedb.spark.PancakeSegmentReader.fillPartitionColumn
@@ -15,10 +15,7 @@ import org.apache.spark.sql.vectorized.{ColumnVector, ColumnarBatch}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
 
 case class PancakeSegmentReader(
   params: Parameters,
@@ -36,38 +33,17 @@ case class PancakeSegmentReader(
 
   override def get(): ColumnarBatch = {
     val segment = inputSegment.segment
-    val partitionFields = segment.getPartitionList.asScala
-      .map(partitionField => partitionField.getName -> partitionField)
-      .toMap
-    val columnMetas = pancakeSchema.getColumnsList.asScala
-      .map(meta => meta.getName -> meta)
-      .toMap
-    val futures = requiredSchema
-      .fields
-      .map(_.name)
-      .filter(!partitionFields.contains(_))
-      .map(columnName => columnName -> Future {
-        val startTime = System.currentTimeMillis()
-        val res = client.decodeSegmentRepLevelsColumn(
-          params.tableName,
-          segment.getPartitionList.asScala.to[ArrayBuffer],
-          segment.getSegmentId,
-          columnMetas(columnName),
-        )
-        logger.info(
-          s"""Queried and decoded columnar bytes for segment
-             | ${segment.getSegmentId}
-             | column $columnName in
-             | ${System.currentTimeMillis() - startTime}ms"""
-            .stripMargin.replaceAll("\n", "")
-        )
-        res
-      })
-      .toMap[String, Future[RepLevelsColumn[_]]]
-    val ordinaryColumns = futures.mapValues(Await.result(_, Duration.Inf))
+    val partitionFields = segment.getPartitionMap.asScala.toMap
+    val columnMetas = pancakeSchema.getColumnsMap.asScala
+    val ordinaryColumns = client.decodeSegmentRepLevelsColumns(
+      params.tableName,
+      partitionFields,
+      segment.getSegmentId,
+      columnMetas
+    )
 
     val n = if (inputSegment.useSegmentCounts) {
-      segment.getMetadata.getCount
+      segment.getMetadata.getRowCount
     } else {
       ordinaryColumns.values.map(_.nRows).reduce((a, b) => a.min(b))
     }
@@ -120,6 +96,8 @@ case class PancakeSegmentReader(
         LongHandler.fillVector(repLevelsColumn, vector)
       case DataType.BOOL =>
         BooleanHandler.fillVector(repLevelsColumn, vector)
+      case DataType.FLOAT32 =>
+        FloatHandler.fillVector(repLevelsColumn, vector)
       case DataType.FLOAT64 =>
         DoubleHandler.fillVector(repLevelsColumn, vector)
       case DataType.STRING | DataType.BYTES =>
@@ -129,7 +107,7 @@ case class PancakeSegmentReader(
     }
     logger.info(
       s"""Filled Spark vector for segment ${inputSegment.segment.getSegmentId}
-         | column ${meta.getName} in
+         | ${meta.getDtype} column in
          | ${System.currentTimeMillis() - startTime}ms"""
         .stripMargin.replaceAll("\n", "")
     )
@@ -143,19 +121,19 @@ object PancakeSegmentReader {
     pbTimestamp.getSeconds * 1000000 + pbTimestamp.getNanos / 1000
   }
 
-  def fillPartitionColumn(column: WritableColumnVector, n: Int, value: PartitionField): Unit = {
+  def fillPartitionColumn(column: WritableColumnVector, n: Int, value: PartitionFieldValue): Unit = {
     value.getValueCase match {
-      case PartitionField.ValueCase.INT64_VAL => column.putLongs(0, n, value.getInt64Val)
-      case PartitionField.ValueCase.STRING_VAL =>
+      case PartitionFieldValue.ValueCase.INT64_VAL => column.putLongs(0, n, value.getInt64Val)
+      case PartitionFieldValue.ValueCase.STRING_VAL =>
         val bytes = value.getStringVal.getBytes
         for (i <- 0 until n) {
           column.putByteArray(i, bytes)
         }
-      case PartitionField.ValueCase.BOOL_VAL => column.putBooleans(0, n, value.getBoolVal)
-      case PartitionField.ValueCase.TIMESTAMP_VAL =>
+      case PartitionFieldValue.ValueCase.BOOL_VAL => column.putBooleans(0, n, value.getBoolVal)
+      case PartitionFieldValue.ValueCase.TIMESTAMP_VAL =>
         val pbTimestamp = value.getTimestampVal
         column.putLongs(0, n, timestampToMicros(pbTimestamp))
-      case PartitionField.ValueCase.VALUE_NOT_SET => throw UnrecognizedPartitionDataTypeException
+      case PartitionFieldValue.ValueCase.VALUE_NOT_SET => throw UnrecognizedPartitionDataTypeException
     }
     column.setIsConstant()
   }
@@ -174,6 +152,7 @@ object PancakeSegmentReader {
           val bytes = fv.getBytesVal.toByteArray
           vector.appendByteArray(bytes, 0, bytes.length)
         }
+        case DataType.FLOAT32 => (fv: FieldValue) => vector.appendFloat(fv.getFloat32Val)
         case DataType.FLOAT64 => (fv: FieldValue) => vector.appendDouble(fv.getFloat64Val)
         case DataType.TIMESTAMP_MICROS => (fv: FieldValue) =>
           val pbTimestamp = fv.getTimestampVal
