@@ -12,7 +12,7 @@ import scala.collection.mutable.ArrayBuffer
 class BatchWriteReadTest extends SparkTestBase {
   import session.implicits._
   val host = "localhost"
-  val port = 1337
+  val port = 3841
 
   // running this test requires a local instance of PancakeDB on the port
   "writing and reading back a df" should "preserve row count" in {

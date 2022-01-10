@@ -19,7 +19,6 @@ val assemblyIncludedJars = Array[String](
   "aws-java-sdk-s3",
   "gson",
   "hadoop-aws",
-  "idl",
   "protobuf-java",
   "sbt-jni-core",
   "pancake",
@@ -46,7 +45,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided" withSources(),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-streaming" % sparkVersion % "provided",
-  "com.pancakedb" %% "spark-pancake-db-connector" % "0.0.0-alpha.1",
+  "com.pancakedb" %% "spark-pancake-db-connector" % "0.1.0",
 
   "org.apache.hadoop" % "hadoop-aws" % hadoopVersion,
   "com.amazonaws" % "aws-java-sdk-core" % awsVersion,
