@@ -46,8 +46,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided" withSources(),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-streaming" % sparkVersion % "provided",
-  "com.google.protobuf" % "protobuf-java-util" % "3.18.1",
-  "com.pancakedb" %% "spark-pancake-db-connector" % "0.0.0-alpha.0-full",
+  "com.pancakedb" %% "spark-pancake-db-connector" % "0.0.0-alpha.1",
 
   "org.apache.hadoop" % "hadoop-aws" % hadoopVersion,
   "com.amazonaws" % "aws-java-sdk-core" % awsVersion,
