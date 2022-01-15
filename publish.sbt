@@ -4,6 +4,7 @@ ThisBuild / organization := "com.pancakedb"
 ThisBuild / organizationName := "PancakeDB"
 ThisBuild / organizationHomepage := Some(url("https://pancakedb.com"))
 
+ThisBuild / versionScheme := Some("early-semver")
 ThisBuild / scmInfo := Some(
   ScmInfo(
     url("https://github.com/pancake-db/"),
