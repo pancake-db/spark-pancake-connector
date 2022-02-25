@@ -13,11 +13,10 @@ class BatchWriteReadTest extends SparkTestBase {
   import session.implicits._
   val host = "localhost"
   val port = 3841
+  val tableName = "batch_write_read_test"
 
   // running this test requires a local instance of PancakeDB on the port
   "writing and reading back a df" should "preserve row count" in {
-    val tableName = "batch_write_read_test"
-
     val client = PancakeClient(host, port)
     try {
       client.Api.dropTable(DropTableRequest.newBuilder().setTableName(tableName).build())

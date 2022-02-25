@@ -27,19 +27,19 @@ case class PancakeScan(
 
   override def planInputPartitions(): Array[InputPartition] = {
     val partitionColumns = pancakeSchema.getPartitioningMap.asScala
-    val useSegmentMeta = requiredColumns.forall(partitionColumns.contains)
+    val onlyPartitionColumns = requiredColumns.forall(partitionColumns.contains)
 
     val listSegmentsReq = ListSegmentsRequest.newBuilder()
       .setTableName(params.tableName)
       .addAllPartitionFilter(filters.asJava)
-      .setIncludeMetadata(useSegmentMeta)
+      .setIncludeMetadata(onlyPartitionColumns)
       .build()
 
     val listSegmentsResp = client.Api.listSegments(listSegmentsReq)
     val segments = listSegmentsResp
       .getSegmentsList
       .asScala
-      .map(segment => PancakeInputSegment(segment, useSegmentMeta))
+      .map(segment => PancakeInputSegment(segment, onlyPartitionColumns))
       .toArray[InputPartition]
 
     logger.info(s"Listed ${segments.length} segments for table scan")
@@ -74,5 +74,8 @@ case class PancakeScan(
 }
 
 object PancakeScan {
-  case class PancakeInputSegment(segment: Segment, useSegmentCounts: Boolean) extends InputPartition
+  case class PancakeInputSegment(
+    segment: Segment,
+    onlyPartitionColumns: Boolean,
+  ) extends InputPartition
 }

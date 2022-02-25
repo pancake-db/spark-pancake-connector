@@ -34,34 +34,50 @@ case class PancakeSegmentReader(
   override def get(): ColumnarBatch = {
     val segment = inputSegment.segment
     val partitionFields = segment.getPartitionMap.asScala.toMap
-    val columnMetas = pancakeSchema.getColumnsMap.asScala
-    val ordinaryColumns = client.decodeSegmentRepLevelsColumns(
-      params.tableName,
-      partitionFields,
-      segment.getSegmentId,
-      columnMetas
-    )
 
-    val n = if (inputSegment.useSegmentCounts) {
-      segment.getMetadata.getRowCount
-    } else {
-      ordinaryColumns.values.map(_.nRows).reduce((a, b) => a.min(b))
-    }
-
-    val columnVectors = OnHeapColumnVector.allocateColumns(n, requiredSchema)
-    val batch = new ColumnarBatch(columnVectors.map(_.asInstanceOf[ColumnVector]), n)
-    requiredSchema
-      .map(_.name)
-      .zipWithIndex
-      .foreach({ case (colName, i) =>
-        if (partitionFields.contains(colName)) {
+    if (inputSegment.onlyPartitionColumns) {
+      val n = segment.getMetadata.getRowCount
+      val columnVectors = OnHeapColumnVector.allocateColumns(n, requiredSchema)
+      val batch = new ColumnarBatch(columnVectors.map(_.asInstanceOf[ColumnVector]), n)
+      requiredSchema
+        .map(_.name)
+        .zipWithIndex
+        .foreach({ case (colName, i) =>
           fillPartitionColumn(columnVectors(i), n, partitionFields(colName))
-        } else {
-          fillOrdinaryColumn(columnVectors(i), ordinaryColumns(colName), columnMetas(colName))
-        }
-      })
+        })
 
-    batch
+      batch
+    } else {
+      val requiredColumnNames = requiredSchema.fields.map(_.name).toSet
+      val requiredColumnMetas = pancakeSchema.getColumnsMap.asScala
+        .filter({case (name, _) => requiredColumnNames(name)})
+
+      logger.info(
+        s"""Reading ${requiredColumnNames.size} non-partition
+           |columns from ${params.tableName}: ${requiredColumnNames.mkString(", ")}""".stripMargin
+      )
+      val ordinaryColumns = client.decodeSegmentRepLevelsColumns(
+        params.tableName,
+        partitionFields,
+        segment.getSegmentId,
+        requiredColumnMetas
+      )
+      val n = ordinaryColumns.values.map(_.nRows).reduce((a, b) => a.min(b))
+      val columnVectors = OnHeapColumnVector.allocateColumns(n, requiredSchema)
+      val batch = new ColumnarBatch(columnVectors.map(_.asInstanceOf[ColumnVector]), n)
+      requiredSchema
+        .map(_.name)
+        .zipWithIndex
+        .foreach({ case (colName, i) =>
+          if (partitionFields.contains(colName)) {
+            fillPartitionColumn(columnVectors(i), n, partitionFields(colName))
+          } else {
+            fillOrdinaryColumn(columnVectors(i), ordinaryColumns(colName), requiredColumnMetas(colName))
+          }
+        })
+
+      batch
+    }
   }
 
   override def close(): Unit = {}
