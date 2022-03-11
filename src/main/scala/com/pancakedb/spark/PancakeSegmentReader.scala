@@ -25,15 +25,17 @@ case class PancakeSegmentReader(
   inputSegment: PancakeInputSegment,
 ) extends PartitionReader[ColumnarBatch] {
   private val logger = LoggerFactory.getLogger(getClass)
+  // there's always just one columnar batch
+  private var has_more = true
 
   override def next(): Boolean = {
-    // there's always just 1 batch
-    false
+    has_more
   }
 
   override def get(): ColumnarBatch = {
     val segment = inputSegment.segment
     val partitionFields = segment.getPartitionMap.asScala.toMap
+    has_more = false
 
     if (inputSegment.onlyPartitionColumns) {
       val n = segment.getMetadata.getRowCount
