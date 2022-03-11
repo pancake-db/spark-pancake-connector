@@ -22,8 +22,7 @@ case class PancakeScan(
   private val logger = LoggerFactory.getLogger(getClass)
   val requiredColumns: Array[String] = requiredSchema.fields.map(_.name)
 
-  // TODO we obviously do support columnar reads, but what is this option
-  // override def supportColumnarReads(partition: InputPartition): Boolean = true
+  override def supportColumnarReads(partition: InputPartition): Boolean = true
 
   override def planInputPartitions(): Array[InputPartition] = {
     val partitionColumns = pancakeSchema.getPartitioningMap.asScala
