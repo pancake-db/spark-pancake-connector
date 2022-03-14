@@ -56,7 +56,9 @@ case class PancakeSegmentReader(
 
       logger.info(
         s"""Reading ${requiredColumnNames.size} non-partition
-           |columns from ${params.tableName}: ${requiredColumnNames.mkString(", ")}""".stripMargin
+           |columns from ${params.tableName}: ${requiredColumnNames.mkString(", ")}"""
+          .stripMargin
+          .replaceAll("\n", "")
       )
       val ordinaryColumns = client.decodeSegmentRepLevelsColumns(
         params.tableName,
@@ -127,7 +129,8 @@ case class PancakeSegmentReader(
       s"""Filled Spark vector for segment ${inputSegment.segment.getSegmentId}
          | ${meta.getDtype} column in
          | ${System.currentTimeMillis() - startTime}ms"""
-        .stripMargin.replaceAll("\n", "")
+        .stripMargin
+        .replaceAll("\n", "")
     )
   }
 }

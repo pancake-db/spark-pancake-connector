@@ -4,12 +4,14 @@ import com.google.protobuf.{Timestamp => PbTimestamp}
 import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl
 import com.pancakedb.idl.PartitionFieldComparison.Operator
-import com.pancakedb.idl.{PartitionDataType, PartitionFieldComparison, PartitionFieldValue, PartitionFilter}
+import com.pancakedb.idl._
 import com.pancakedb.spark.Exceptions.UnrecognizedPartitionDataTypeException
+import com.pancakedb.spark.PancakeScan.PancakeInputSegment
 import com.pancakedb.spark.PancakeScanBuilder.partitionFieldValue
-import org.apache.spark.sql.connector.read.{Scan, ScanBuilder, SupportsPushDownFilters, SupportsPushDownRequiredColumns}
+import org.apache.spark.sql.connector.read._
 import org.apache.spark.sql.sources._
 import org.apache.spark.sql.types.StructType
+import org.slf4j.LoggerFactory
 
 import java.sql
 import scala.collection.JavaConverters._
@@ -23,9 +25,32 @@ case class PancakeScanBuilder(
 ) extends ScanBuilder with SupportsPushDownRequiredColumns with SupportsPushDownFilters {
   private val partitionFilters: ArrayBuffer[Filter] = ArrayBuffer.empty
   private val pancakeFilters: ArrayBuffer[PartitionFilter] = ArrayBuffer.empty
+  private val logger = LoggerFactory.getLogger(getClass)
+
+  def loadSegments(): Array[InputPartition] = {
+    val requiredColumns: Array[String] = requiredSchema.fields.map(_.name)
+    val partitionColumns = pancakeSchema.getPartitioningMap.asScala
+    val onlyPartitionColumns = requiredColumns.forall(partitionColumns.contains)
+
+    val listSegmentsReq = ListSegmentsRequest.newBuilder()
+      .setTableName(params.tableName)
+      .addAllPartitionFilter(pancakeFilters.asJava)
+      .setIncludeMetadata(onlyPartitionColumns)
+      .build()
+
+    val listSegmentsResp = client.Api.listSegments(listSegmentsReq)
+    val segments = listSegmentsResp
+      .getSegmentsList
+      .asScala
+      .map(segment => PancakeInputSegment(segment, onlyPartitionColumns))
+      .toArray[InputPartition]
+
+    logger.info(s"Listed ${segments.length} segments for table scan")
+    segments
+  }
 
   override def build(): Scan = {
-    PancakeScan(params, pancakeSchema, requiredSchema, pancakeFilters, client)
+    PancakeScan(params, pancakeSchema, requiredSchema, loadSegments(), client)
   }
 
   override def pruneColumns(requiredSchema: StructType): Unit = {
