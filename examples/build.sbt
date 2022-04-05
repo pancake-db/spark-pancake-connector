@@ -10,15 +10,20 @@ val hadoopVersion = "3.2.2"
 
 ThisBuild / assemblyShadeRules := Seq(
   ShadeRule.rename("com.google.protobuf.**" -> "shadepb.@1").inAll,
-  ShadeRule.rename("com.google.gson.**" -> "shadegson.@1").inAll,
+  ShadeRule.rename("com.google.common.**" -> "shadegoogle.@1").inAll,
+  ShadeRule.rename("io.netty.**" -> "shadenetty.@1").inAll,
 )
 
 val assemblyIncludedJars = Array[String](
   "aws-java-sdk-core",
   "aws-java-sdk-dynamodb", //frustratingly an import needed in hadoop aws
   "aws-java-sdk-s3",
-  "gson",
+  "guava",
+  "failureaccess",
+  "grpc",
   "hadoop-aws",
+  "netty",
+  "perfmark",
   "protobuf-java",
   "sbt-jni-core",
   "pancake",
@@ -45,7 +50,7 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided" withSources(),
   "org.apache.spark" %% "spark-sql" % sparkVersion % "provided",
   "org.apache.spark" %% "spark-streaming" % sparkVersion % "provided",
-  "com.pancakedb" %% "spark-pancake-db-connector" % "0.1.2",
+  "com.pancakedb" %% "spark-pancake-db-connector" % "0.2.0",
 
   "org.apache.hadoop" % "hadoop-aws" % hadoopVersion,
   "com.amazonaws" % "aws-java-sdk-core" % awsVersion,
