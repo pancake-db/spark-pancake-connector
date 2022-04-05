@@ -1,9 +1,9 @@
 package com.pancakedb.spark
 
-import com.pancakedb.client.Exceptions.HttpException
 import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl._
 import com.pancakedb.spark.BatchWriteReadTest.{TestRow, baseRow}
+import io.grpc.StatusRuntimeException
 import org.apache.spark.sql.SaveMode
 
 import java.sql.Timestamp
@@ -12,16 +12,16 @@ import scala.collection.mutable.ArrayBuffer
 class BatchWriteReadTest extends SparkTestBase {
   import session.implicits._
   val host = "localhost"
-  val port = 3841
+  val port = 3842
   val tableName = "batch_write_read_test"
 
   // running this test requires a local instance of PancakeDB on the port
   "writing and reading back a df" should "preserve row count" ignore {
     val client = PancakeClient(host, port)
     try {
-      client.Api.dropTable(DropTableRequest.newBuilder().setTableName(tableName).build())
+      client.grpc.dropTable(DropTableRequest.newBuilder().setTableName(tableName).build()).get()
     } catch {
-      case HttpException(404, _) =>
+      case e: StatusRuntimeException if e.getStatus.getCode.value() == 404 =>
     }
     val schema = Schema.newBuilder()
       .putPartitioning("part", PartitionMeta.newBuilder().setDtype(PartitionDataType.TIMESTAMP_MINUTE).build())
@@ -38,7 +38,7 @@ class BatchWriteReadTest extends SparkTestBase {
       .setSchema(schema)
       .setMode(CreateTableRequest.SchemaMode.OK_IF_EXACT)
       .build()
-    client.Api.createTable(createTableReq)
+    client.grpc.createTable(createTableReq).get()
 
     val inputRows = ArrayBuffer.empty[TestRow]
     val partitionTs = new Timestamp(1632097320000L)
