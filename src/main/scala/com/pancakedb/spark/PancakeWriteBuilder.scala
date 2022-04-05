@@ -60,13 +60,13 @@ case class PancakeWriteBuilder(
       val dropTableRequest = DropTableRequest.newBuilder()
         .setTableName(params.tableName)
         .build()
-      client.Api.dropTable(dropTableRequest)
+      client.grpc.dropTable(dropTableRequest).get()
       val createTableRequest = CreateTableRequest.newBuilder()
         .setTableName(params.tableName)
         .setMode(CreateTableRequest.SchemaMode.FAIL_IF_EXISTS)
         .setSchema(pancakeSchema)
         .build()
-      client.Api.createTable(createTableRequest)
+      client.grpc.createTable(createTableRequest).get()
     } else if (!exists) {
       logger.info(
         s"""Table ${params.tableName} does not exist yet;
@@ -78,7 +78,7 @@ case class PancakeWriteBuilder(
         .setMode(CreateTableRequest.SchemaMode.FAIL_IF_EXISTS)
         .setSchema(pancakeSchema)
         .build()
-      client.Api.createTable(createTableRequest)
+      client.grpc.createTable(createTableRequest).get()
     }
 
     val partitionFieldGetters = pancakeSchema

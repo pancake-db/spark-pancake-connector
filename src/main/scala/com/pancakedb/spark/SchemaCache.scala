@@ -19,7 +19,7 @@ case class SchemaCache(tableName: String, client: PancakeClient) {
           .build()
 
         schema = try {
-          Some(Some(client.Api.getSchema(getSchemaReq).getSchema))
+          Some(Some(client.grpc.getSchema(getSchemaReq).get().getSchema))
         } catch {
           case HttpException(404, _) => Some(None)
         }

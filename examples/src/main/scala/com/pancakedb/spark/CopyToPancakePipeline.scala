@@ -5,7 +5,7 @@ import org.apache.spark.sql.{SaveMode, SparkSession}
 object CopyToPancakePipeline extends Pipeline {
   override def run(session: SparkSession, arguments: Arguments): Unit = {
     val host = arguments.string("host").get
-    val port = arguments.int("port").getOrElse(3841)
+    val port = arguments.int("port").getOrElse(3842)
     val bucket = arguments.string("bucket").get
     val tablesDir = arguments.string("tables_dir").get
     val tableName = arguments.string("table_name").get

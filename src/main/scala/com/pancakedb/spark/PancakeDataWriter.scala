@@ -53,7 +53,7 @@ case class PancakeDataWriter(
       .addAllRows(rows.asJava)
       .build()
     stagedRows(partition) = ArrayBuffer.empty
-    client.Api.writeToPartition(req)
+    client.grpc.writeToPartition(req).get()
 
     val newNWritten = nWritten + rows.length
     if (newNWritten / NWrittenPerInfo != nWritten / NWrittenPerInfo) {

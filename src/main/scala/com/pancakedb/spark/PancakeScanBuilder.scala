@@ -38,7 +38,7 @@ case class PancakeScanBuilder(
       .setIncludeMetadata(onlyPartitionColumns)
       .build()
 
-    val listSegmentsResp = client.Api.listSegments(listSegmentsReq)
+    val listSegmentsResp = client.grpc.listSegments(listSegmentsReq).get()
     val segments = listSegmentsResp
       .getSegmentsList
       .asScala

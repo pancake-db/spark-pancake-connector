@@ -6,7 +6,7 @@ import org.apache.spark.sql.streaming.OutputMode
 class StreamingWriteTest extends SparkTestBase {
   import session.implicits._
   val host = "localhost"
-  val pancakePort = 3841
+  val pancakePort = 3842
   val socketPort = 12345
 
   // running this test requires a local instance of PancakeDB on the port
