@@ -1,6 +1,5 @@
 package com.pancakedb.spark
 
-import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl
 import com.pancakedb.idl._
 import com.pancakedb.spark.Exceptions.{UnrecognizedDataTypeException, UnrecognizedPartitionDataTypeException}
@@ -23,11 +22,7 @@ case class PancakeTable(
   providedSchema: Option[StructType],
 ) extends Table with SupportsRead with SupportsWrite {
   private val logger = LoggerFactory.getLogger(getClass)
-  private val client: PancakeClient = {
-    logger.info(s"Initializing Pancake client with host ${params.host} and port ${params.port}")
-    PancakeClient(host = params.host, port = params.port)
-  }
-  private val pancakeSchemaCache = SchemaCache(params.tableName, client)
+  private val pancakeSchemaCache = SchemaCache(params)
 
   override def name(): String = params.tableName
 
@@ -42,8 +37,7 @@ case class PancakeTable(
 
   // Pancake tables are often partitioned, but we'd have to construct
   // a `Transform`, and all the pre-existing implementations are private.
-  // This is only used in batch writing (which we don't support) and
-  // describe table, so we can skip it.
+  // This is only necessary in describe table, so we can skip it.
   override lazy val partitioning: Array[Transform] = Array.empty
 
   def schema: StructType = {
@@ -58,11 +52,11 @@ case class PancakeTable(
 
   override def newScanBuilder(options: CaseInsensitiveStringMap): ScanBuilder = {
     val params = Parameters.fromCaseInsensitiveStringMap(options)
-    PancakeScanBuilder(params, pancakeSchemaCache.get, schema, client)
+    PancakeScanBuilder(params, pancakeSchemaCache.get, schema)
   }
 
   override def newWriteBuilder(info: LogicalWriteInfo): WriteBuilder = {
-    PancakeWriteBuilder(params, pancakeSchemaCache, info.schema(), client)
+    PancakeWriteBuilder(params, pancakeSchemaCache, info.schema())
   }
 }
 

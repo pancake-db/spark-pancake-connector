@@ -17,7 +17,6 @@ case class PancakeWriteBuilder(
   params: Parameters,
   pancakeSchemaCache: SchemaCache,
   schema: StructType,
-  client: PancakeClient,
 ) extends WriteBuilder with BatchWrite with StreamingWrite with SupportsTruncate {
   private val logger = LoggerFactory.getLogger(getClass)
   private var isTruncate = false
@@ -51,6 +50,7 @@ case class PancakeWriteBuilder(
         (false, pSchema)
     }
 
+    val client = PancakeClientCache.getFromParams(params)
     if (exists && isTruncate) {
       logger.info(
         s"""Table ${params.tableName} exists but we are in truncate mode;
@@ -116,7 +116,6 @@ case class PancakeWriteBuilder(
 
     PancakeDataWriterFactory(
       params,
-      client,
       info.numPartitions(),
       partitionFieldGetters,
       fieldGetters,

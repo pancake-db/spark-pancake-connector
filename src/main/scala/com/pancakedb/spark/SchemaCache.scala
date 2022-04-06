@@ -1,12 +1,15 @@
 package com.pancakedb.spark
 
-import com.pancakedb.client.Exceptions.HttpException
-import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl.{GetSchemaRequest, Schema}
 import com.pancakedb.spark.Exceptions.TableDoesNotExist
+import io.grpc.Status.Code
+import io.grpc.StatusRuntimeException
 import org.slf4j.LoggerFactory
 
-case class SchemaCache(tableName: String, client: PancakeClient) {
+import java.util.concurrent.ExecutionException
+
+case class SchemaCache(params: Parameters) {
+  private val tableName = params.tableName
   private val logger = LoggerFactory.getLogger(getClass)
   private var schema: Option[Option[Schema]] = None
 
@@ -19,9 +22,16 @@ case class SchemaCache(tableName: String, client: PancakeClient) {
           .build()
 
         schema = try {
+          val client = PancakeClientCache.getFromParams(params)
           Some(Some(client.grpc.getSchema(getSchemaReq).get().getSchema))
         } catch {
-          case HttpException(404, _) => Some(None)
+          case e: ExecutionException =>
+            val cause = e.getCause.asInstanceOf[StatusRuntimeException]
+            if (cause.getStatus.getCode == Code.NOT_FOUND) {
+              Some(None)
+            } else {
+              throw e
+            }
         }
       }
     }

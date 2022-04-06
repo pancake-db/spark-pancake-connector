@@ -21,7 +21,6 @@ case class PancakeScanBuilder(
   params: Parameters,
   pancakeSchema: idl.Schema,
   private var requiredSchema: StructType,
-  client: PancakeClient,
 ) extends ScanBuilder with SupportsPushDownRequiredColumns with SupportsPushDownFilters {
   private val partitionFilters: ArrayBuffer[Filter] = ArrayBuffer.empty
   private val pancakeFilters: ArrayBuffer[PartitionFilter] = ArrayBuffer.empty
@@ -38,6 +37,7 @@ case class PancakeScanBuilder(
       .setIncludeMetadata(onlyPartitionColumns)
       .build()
 
+    val client = PancakeClientCache.getFromParams(params)
     val listSegmentsResp = client.grpc.listSegments(listSegmentsReq).get()
     val segments = listSegmentsResp
       .getSegmentsList
@@ -50,7 +50,7 @@ case class PancakeScanBuilder(
   }
 
   override def build(): Scan = {
-    PancakeScan(params, pancakeSchema, requiredSchema, loadSegments(), client)
+    PancakeScan(params, pancakeSchema, requiredSchema, loadSegments())
   }
 
   override def pruneColumns(requiredSchema: StructType): Unit = {
