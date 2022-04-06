@@ -7,7 +7,6 @@ import org.apache.spark.sql.connector.write.{DataWriter, DataWriterFactory}
 
 case class PancakeDataWriterFactory(
   params: Parameters,
-  client: PancakeClient,
   numPartitions: Int,
   partitionFieldGetters: Array[PartitionFieldGetter],
   fieldGetters: Array[FieldGetter],
@@ -16,7 +15,6 @@ case class PancakeDataWriterFactory(
   override def createWriter(partitionId: Int, taskId: Long): DataWriter[InternalRow] = {
     PancakeDataWriter(
       params,
-      client,
       numPartitions,
       partitionId,
       taskId,

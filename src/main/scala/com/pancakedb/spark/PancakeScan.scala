@@ -1,6 +1,5 @@
 package com.pancakedb.spark
 
-import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl
 import com.pancakedb.idl.Segment
 import com.pancakedb.spark.PancakeScan.PancakeInputSegment
@@ -13,7 +12,6 @@ case class PancakeScan(
   pancakeSchema: idl.Schema,
   requiredSchema: StructType,
   segments: Array[InputPartition],
-  client: PancakeClient
 ) extends Scan with Batch with PartitionReaderFactory {
 
   override def supportColumnarReads(partition: InputPartition): Boolean = true
@@ -41,7 +39,6 @@ case class PancakeScan(
       params,
       pancakeSchema,
       requiredSchema,
-      client,
       partition.asInstanceOf[PancakeInputSegment],
     )
   }

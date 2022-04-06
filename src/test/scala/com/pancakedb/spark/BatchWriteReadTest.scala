@@ -3,6 +3,7 @@ package com.pancakedb.spark
 import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl._
 import com.pancakedb.spark.BatchWriteReadTest.{TestRow, baseRow}
+import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
 import org.apache.spark.sql.SaveMode
 
@@ -21,7 +22,7 @@ class BatchWriteReadTest extends SparkTestBase {
     try {
       client.grpc.dropTable(DropTableRequest.newBuilder().setTableName(tableName).build()).get()
     } catch {
-      case e: StatusRuntimeException if e.getStatus.getCode.value() == 404 =>
+      case e: StatusRuntimeException if e.getStatus.getCode == Code.NOT_FOUND =>
     }
     val schema = Schema.newBuilder()
       .putPartitioning("part", PartitionMeta.newBuilder().setDtype(PartitionDataType.TIMESTAMP_MINUTE).build())
@@ -83,7 +84,6 @@ class BatchWriteReadTest extends SparkTestBase {
     }
     assertResult(inputRows.length)(rows.length)
   }
-
 }
 
 object BatchWriteReadTest {

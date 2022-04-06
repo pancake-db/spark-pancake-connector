@@ -1,6 +1,5 @@
 package com.pancakedb.spark
 
-import com.pancakedb.client.PancakeClient
 import com.pancakedb.idl
 import com.pancakedb.idl.{FieldValue, PartitionFieldValue, WriteToPartitionRequest}
 import com.pancakedb.spark.PancakeDataWriter.{HashedPartition, NWrittenPerInfo, PancakeCommitMessage}
@@ -14,7 +13,6 @@ import scala.collection.mutable.ArrayBuffer
 
 case class PancakeDataWriter(
   params: Parameters,
-  client: PancakeClient,
   numPartitions: Int,
   partitionId: Int,
   taskId: Long,
@@ -53,6 +51,7 @@ case class PancakeDataWriter(
       .addAllRows(rows.asJava)
       .build()
     stagedRows(partition) = ArrayBuffer.empty
+    val client = PancakeClientCache.getFromParams(params)
     client.grpc.writeToPartition(req).get()
 
     val newNWritten = nWritten + rows.length

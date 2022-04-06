@@ -1,9 +1,9 @@
 package com.pancakedb.spark
 
 import com.google.protobuf.{Timestamp => PbTimestamp}
-import com.pancakedb.client.{PancakeClient, RepLevelsColumn}
+import com.pancakedb.client.RepLevelsColumn
 import com.pancakedb.idl._
-import com.pancakedb.spark.AtomHandlers.{BooleanHandler, ByteHandler, DoubleHandler, FloatHandler, LongHandler}
+import com.pancakedb.spark.AtomHandlers._
 import com.pancakedb.spark.Exceptions.{UnrecognizedDataTypeException, UnrecognizedPartitionDataTypeException}
 import com.pancakedb.spark.PancakeScan.PancakeInputSegment
 import com.pancakedb.spark.PancakeSegmentReader.fillPartitionColumn
@@ -21,21 +21,20 @@ case class PancakeSegmentReader(
   params: Parameters,
   pancakeSchema: Schema,
   requiredSchema: StructType,
-  client: PancakeClient,
   inputSegment: PancakeInputSegment,
 ) extends PartitionReader[ColumnarBatch] {
   private val logger = LoggerFactory.getLogger(getClass)
   // there's always just one columnar batch
-  private var has_more = true
+  private var hasMore = true
 
   override def next(): Boolean = {
-    has_more
+    hasMore
   }
 
   override def get(): ColumnarBatch = {
     val segment = inputSegment.segment
     val partitionFields = segment.getPartitionMap.asScala.toMap
-    has_more = false
+    hasMore = false
 
     if (inputSegment.onlyPartitionColumns) {
       val n = segment.getMetadata.getRowCount
@@ -50,6 +49,7 @@ case class PancakeSegmentReader(
 
       batch
     } else {
+      val client = PancakeClientCache.getFromParams(params)
       val requiredColumnNames = requiredSchema.fields.map(_.name).toSet
       val requiredColumnMetas = pancakeSchema.getColumnsMap.asScala
         .filter({case (name, _) => requiredColumnNames(name)})
